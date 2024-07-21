@@ -1,106 +1,110 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import urllib, threading, re, sys, Queue, time
-   
-#Don't create .pyc
+import urllib.request, threading, re, sys, time   # since python 2.7 the module Queue not work 
+import queue  # Python 3 
+
+# Don't create .pyc
 sys.dont_write_bytecode = True
 
-#Colours
-red="\033[1;31m"
-green="\033[1;32m"
-yellow="\033[1;33m"
-blue="\033[1;34m"
+# Colours
+red = "\033[1;31m"
+green = "\033[1;32m"
+yellow = "\033[1;33m"
+blue = "\033[1;34m"
 defcol = "\033[0m"
 
 def error(msg):
-	print (red+"["+yellow+"!"+red+"] - "+defcol+msg)
+    print(red + "[" + yellow + "!" + red + "] - " + defcol + msg)
 
 def alert(msg):
-	print (red+"["+blue+"#"+red+"] - "+defcol+ msg)
+    print(red + "[" + blue + "#" + red + "] - " + defcol + msg)
 
 def action(msg):
-	print (red+"["+green+"+"+red+"] - "+defcol+msg)
+    print(red + "[" + green + "+" + red + "] - " + defcol + msg)
 
 def errorExit(msg):
-	sys.exit(red+"["+yellow+"!"+red+"] - "+defcol+"Fatal - "+ msg)
-       
+    sys.exit(red + "[" + yellow + "!" + red + "] - " + defcol + "Fatal - " + msg)
+
 def getorders():
     name = sys.argv[1]
     try:
-        maxThreads = int(sys.argv[sys.argv.index("-t")+1])
-    except ValueError: maxThreads = 40
+        maxThreads = int(sys.argv[sys.argv.index("-t") + 1])
+    except (ValueError, IndexError):
+        maxThreads = 40
     try:
-        leechlist = sys.argv[sys.argv.index("-l")+1]
-    except: leechlist = "sites.txt"
+        leechlist = sys.argv[sys.argv.index("-l") + 1]
+    except (ValueError, IndexError):
+        leechlist = "sites.txt"
     try:
-        if sys.argv.index("-s"): bSort = True
-    except ValueError: bSort = False
-   
-   
+        if sys.argv.index("-s"):
+            bSort = True
+    except ValueError:
+        bSort = False
+
     return [name, maxThreads, leechlist, bSort]
- 
+
 def sort():
     proxylist = open(orders[0], "r")
     setList = set()
     nCounter = 0
-   
+
     for aaa in proxylist:
         aaa = aaa.strip()
         setList.add(aaa)
         nCounter += 1
-       
+
     proxylist.close()
-    proxylist = open(orders[0], "wb")
+    proxylist = open(orders[0], "w")
     for bbb in setList:
-        proxylist.write(bbb+"\n")
-           
+        proxylist.write(bbb + "\n")
+
     proxylist.close()
-           
+
     alert("%s proxies in list, %s unique proxies in list." % (nCounter, len(setList)))
- 
+
 class scan_thread(threading.Thread):
-    def run (self):
+    def run(self):
         while True:
             url = threadPool.get()
             try:
-                get = urllib.urlopen(url)
+                get = urllib.request.urlopen(url)
             except IOError:
                 threadPool.task_done()
                 continue
-            data = get.read()
-            validProxies = re.findall('(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})\:(?:[\d]{2,5})', data)
+            data = get.read().decode('utf-8')
+            validProxies = re.findall(r'(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})\.(?:[\d]{1,3})\:(?:[\d]{2,5})', data)
             action("%s proxies found on %s" % (len(validProxies), url))
             for proxy in validProxies:
-                proxylist.write(proxy+"\n")
-               
+                proxylist.write(proxy + "\n")
+
             if len(validProxies) > 0:
-                good_sites.write(url+"\n")
+                good_sites.write(url + "\n")
             threadPool.task_done()
-               
+
 if len(sys.argv) < 2:
-    errorExit("Usage: python scraper.py <proxylist.txt> [-t threads] [-l leechlist] [-s sort]") 
+    errorExit("Usage: python scraper.py <proxylist.txt> [-t threads] [-l leechlist] [-s sort]")
 
 orders = getorders()
 try:
     proxylist = open(orders[0], "a")
 except IOError:
     errorExit("Could not create/open %s" % orders[0])
-   
+
 try:
-    sites = open(orders[2], "rb")
+    sites = open(orders[2], "r")
 except IOError:
     errorExit("Could not open %s" % orders[2])
-   
+
 try:
-    good_sites = open("good_sites.txt", "wb")
+    good_sites = open("good_sites.txt", "w")
 except IOError:
     errorExit("Could not create good_sites.txt")
- 
-threadPool = Queue.Queue(0)
- 
-for x in xrange(orders[1]):
+
+threadPool = queue.Queue(0)
+
+for x in range(orders[1]):
     scan_thread().start()
-   
+
 while True:
     for url in sites:
         url = url.strip()
@@ -112,7 +116,7 @@ while True:
         if threadPool.empty():
             break
         time.sleep(1)
-       
+
     threadPool.join()
     break
 proxylist.close()
